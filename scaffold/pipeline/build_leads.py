@@ -335,11 +335,26 @@ def run_pipeline(
     raw_events: list = []
     evidence_entries: list = []
     dropped_signals = 0
+    deduped_overlap_signals = 0
+    seen_raw_event_ids: set = set()
     for sig in raw_signals:
         raw_event = _signal_to_raw_event(sig, parcels_by_id=parcels_by_id)
         if raw_event is None:
             dropped_signals += 1
             continue
+        # Idempotency guard: overlapping scraper windows (e.g. a clerk
+        # daily_refresh run that re-walks its 3-day overlap cursor) legitimately
+        # re-emit the same recorded document. Each such re-scrape yields an
+        # identical deterministic raw_event_id / evidence_id, which the strict
+        # evidence-ledger build (§08) rejects as a duplicate evidence_id.
+        # Collapse the re-scrapes here, keeping the first occurrence, so each
+        # document enters the pipeline exactly once. This mirrors the §19
+        # aggregator's by-key idempotency one stage upstream and is county-
+        # agnostic (the dedup key is the framework's own deterministic id).
+        if raw_event["raw_event_id"] in seen_raw_event_ids:
+            deduped_overlap_signals += 1
+            continue
+        seen_raw_event_ids.add(raw_event["raw_event_id"])
         raw_events.append(raw_event)
         evidence_entries.append(_evidence_entry_for_signal(raw_event, sig))
 
@@ -378,6 +393,7 @@ def run_pipeline(
     payload["build_label_reason"] = build_label_reason
     payload["deployment"] = deployment or {}
     payload["dropped_signals_unmapped_doc_type"] = dropped_signals
+    payload["deduped_overlap_signals"] = deduped_overlap_signals
     # Re-derive header counts from records[] — the v5.1.2-beta Two-Truths
     # invariant survives the cutover unchanged.
     assert_two_truths(payload)
@@ -620,6 +636,21 @@ def main() -> int:
                 f"Source-limited build: only sources {sources_used} were "
                 "enabled. Other sources are deferred."
             )
+
+        # §4.16: an explicit operator-declared build label in the county config
+        # wins over the crude source-count heuristic above. The heuristic counts
+        # any translator source (including enrichment) and can only emit
+        # SOURCE_LIMITED/FULL_BUILD — it cannot express PARTIAL_BUILD or
+        # PRIMARY_SOURCE_PENDING, which depend on how many *primary* lead
+        # sources are live vs. pending (build-state knowledge the pipeline does
+        # not have). When the operator sets dashboard.build_label, honor it.
+        cfg_dash = county_config.get("dashboard") or {}
+        cfg_label = (cfg_dash.get("build_label") or "").strip()
+        if cfg_label:
+            build_label = cfg_label
+            cfg_reason = (cfg_dash.get("build_label_reason") or "").strip()
+            if cfg_reason:
+                build_label_reason = cfg_reason
 
         print(f"[production] translated sources: {translated_sources}",
               file=sys.stderr)
