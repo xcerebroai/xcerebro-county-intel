@@ -192,11 +192,26 @@ The runner exits 0 only when every test exits 0.
 
 ## Versioning
 
-This is **v5.3.1 (stable)**.
+This is **v5.5.0 (stable)**.
 
 - Patch (5.0.1) — clarifications, doc fixes
 - Minor (5.1.0) — new patterns, sources, deal paths, architecture additions
 - Major (6.0.0) — breaking changes requiring migration of existing county builds
+
+**v5.5.0 added** (released 2026-06-26):
+
+- **Source category expansion** — 15 mandatory Phase 0.A recon queries and 29 recognized lead types (#5).
+- **Per-state lis pendens classification** — config-driven `state_rule_family` foreclosure regime, county-agnostic (#2).
+- **PII guard for operator-authored county code** — gate test `test_no_pii_in_operator_code.py` + pre-commit hook + installer (#3).
+- Added `IN_judicial_foreclosure` to the `state_rule_family` schema enum (#4).
+
+**v5.4.0 added** (released 2026-06-25):
+
+- **Executable §17–§20 staged pipeline** — normalize → classify → match → aggregate → score → review → dashboard. Monolith core retired.
+- **Option-Y scoring seam** — `matched_leads.json` → scoring/dashboard cutover.
+- **§20 semantic verification + evidence wire-through** (Session 5).
+- **§19 idempotent aggregator** (Session 4).
+- **9 deferred §17 debtor rules** implemented across 12 doc types; multi-owner contract extension; doc-type namespace bridge (R1/G1).
 
 **v5.3.1 added** (released 2026-05-19):
 
