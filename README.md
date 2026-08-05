@@ -31,8 +31,6 @@ This is not a county-specific build. It is a portable shell. County-specific dat
 
 **This is an operator-supervised, checkpointed build. It is not a one-command autonomous install, and treating it as one produces bad county builds.**
 
-Earlier versions of this README advertised a "type one sentence and watch it go" flow. That framing was removed in v5.6.0 because it set the wrong expectation: the parts of a county build that most need operator judgment — deciding whether a source is really blocked, whether a lead type actually exists in that jurisdiction, whether a feed is current — are exactly the parts that cannot be delegated blind. The framework is heavily automated *within* each phase and deliberately stops *between* phases.
-
 The real loop:
 
 1. **Clone this framework into your county-build repo.** The framework lives inside the county repo; the county repo is what you commit to.
