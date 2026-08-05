@@ -3,45 +3,64 @@
 **Copyright © 2026 Xcerebro LLC. All rights reserved.**
 Licensed under the proprietary Xcerebro LLC VIP license. See `LICENSE.md`. This Framework is not open source; access is limited to active Xcerebro LLC VIP members and approved licensees.
 
-Reusable framework for building autonomous county-lead-intelligence dashboards in any county.
+Reusable harness for building county-level distress-lead intelligence systems in any county.
 
-This is not a county-specific build. It is a portable shell. The only file that should change per county is the target county config inside `config/counties/`.
+This is not a county-specific build. It is a portable shell. County-specific data lives in `config/counties/<slug>.json` and `scrapers/<source>.py` — never in the universal pipeline.
 
 ---
 
-## Quick start — one sentence install
+## Current state — v5.6.0 (stable)
 
-**First time using this framework?** Read [`START_HERE.md`](START_HERE.md) for the full first-run walkthrough. The short version:
+**What works today:**
 
-1. **Clone or open** your private county-build repo (this repo).
-2. **Open Claude Code** in the repo directory:
+- The **staged pipeline** is executable end to end: normalize → classify → match → aggregate → score → review → dashboard (`scaffold/pipeline/`).
+- **Phase 0 county recon** is a formalized protocol with 7 mandatory gap-closing steps and 37 automated gate tests.
+- **Contract schemas** for every record shape in the pipeline, schema-validated.
+- **Synthetic test harness** so a build can be exercised before real county data enters it.
+
+**What is not done yet — read this before planning around it:**
+
+- **Production live-browser verification and auto-rollback are NOT implemented.** §20 defines the contract and `scaffold/ops/semantic_verify_template.py` is a documentation-grade template. `verify_live.py` and `watchdog.py` are stubs. Per-county responsibility until universal tooling lands.
+- **The Build Eligibility Gate is operator judgment, not an algorithm.** Protocol 01 §01.16 says so explicitly — the stepwise gate algorithm is not yet formalized. The justification trail is what makes the verdict reviewable.
+- **Scrapers are per-county.** The framework ships no working adapter for any real portal. Every county writes its own against the fingerprint recon produces.
+- **`scaffold/tests/v5_4_0_pending/`** holds behavioral specs that are red by design and quarantined out of the default gate.
+
+---
+
+## How a build actually runs
+
+**This is an operator-supervised, checkpointed build. It is not a one-command autonomous install, and treating it as one produces bad county builds.**
+
+Earlier versions of this README advertised a "type one sentence and watch it go" flow. That framing was removed in v5.6.0 because it set the wrong expectation: the parts of a county build that most need operator judgment — deciding whether a source is really blocked, whether a lead type actually exists in that jurisdiction, whether a feed is current — are exactly the parts that cannot be delegated blind. The framework is heavily automated *within* each phase and deliberately stops *between* phases.
+
+The real loop:
+
+1. **Clone this framework into your county-build repo.** The framework lives inside the county repo; the county repo is what you commit to.
+2. **Bootstrap the run folder:**
    ```
-   claude
+   python scaffold/bootstrap_county.py --county "<Name> County" --state "<State>" --slug <county_state> --phase phase0
    ```
-3. **Type one sentence** when Claude Code's prompt appears:
+   This creates `runs/<slug>/` with a launch file and operator notes. It creates nothing else.
+3. **Open Claude Code and point it at the launch file:**
    ```
-   Build <County Name>, <State>.
+   Read MASTER_PROMPT.md and runs/<slug>/LAUNCH_<SLUG>.md. Run Phase 0 only.
    ```
-   Substitute your actual county and state. See `START_HERE.md` for a worked example.
-4. Claude Code parses the target, shows the interpreted slug, asks approval to run the bootstrap script, and proceeds through Phase 0 autonomously.
-5. **Approve the bootstrap once** when Claude Code asks. The bootstrap script creates `runs/<slug>/` and the launch instructions — nothing else.
-6. **Watch Phase 0 run.** Claude Code performs County Source Recon and the Onboarding Gate. When it stops, it prints a change manifest. Review the manifest before authorizing Phase 1.
+4. **Phase 0 — county source recon.** Expect this to be the longest and most interactive phase. It runs 15 mandatory discovery queries, a 5-layer verification gate per source, a 29-type lead sweep, and 7 required gap-closing steps (§01.22–§01.32). It will ask you things. Answer them — recon quality determines everything downstream.
+5. **Review the change manifest and the build verdict.** This is a real review, not a formality. Check that blocked sources were actually tested, that lead types were checked against the county's own vocabulary, and that "live" feeds are actually current.
+6. **Authorize Build Mode explicitly.** Phase 0 ends at a hard gate. Implicit approval is not accepted.
+7. **Build one thin vertical slice first** — one adapter, end to end, proven — before scaling to the rest of the sources.
+8. **Review at each subsequent phase gate.** Every phase ends with a manifest and a stop.
 
-That's it. No PowerShell commands beyond `claude`. No JSON to edit by hand. No manual launch file to create.
+### What you will be asked to approve
 
-> **Why the one-time approval click?** Claude Code asks before running shell commands by default — that's protection against destructive operations. The autonomous first-run grant is bounded to `scaffold/bootstrap_county.py` only, which creates a folder and a markdown file. Approve once and the bootstrap runs in seconds.
+Claude Code asks before running shell commands and before fetching web content. During a build expect approval requests for: web search and web fetch against official portal domains, `scaffold/bootstrap_county.py`, `scaffold/ops/write_county_config.py` (the only sanctioned way to write a county config), and `scaffold/tests/run_all.py`. Approving these broadly within the county repo is safe and expected.
 
-### Autonomy boundaries (v5.3.1)
+### Hard boundaries
 
-The first run is autonomous in the sense that you type one sentence and approve one bootstrap. Everything after that — source recon, 5-layer verification gate, auto-resolve of blockers, config writing, and the change manifest — runs hands-off.
-
-There are three boundaries operators should know about:
-
-1. **Claude Code may ask for approval to run bounded scripts.** During Phase 0, Claude Code may request permission for `web_search`, `web_fetch` against official portal domains, and one Python script call to atomically write the populated county config (via `scaffold/ops/write_county_config.py` — see MASTER_PROMPT Section 4.28). Approve broadly; the scope is bounded to the current county repo.
-2. **Claude Code stops on config-write failure.** If the writer returns `JSON_INVALID` or `SCHEMA_INVALID`, Claude Code attempts exactly one structured repair and then stops with `CONFIG_WRITE_FAILED` if the second attempt also fails. It does NOT silently proceed. Open the resulting `runs/<slug>/CONFIG_WRITE_FAILED.md` for diagnosis.
-3. **The framework is universal; the county is configured.** A hard contract (MASTER_PROMPT §4.31) requires that universal pipeline code never contains county-specific data. Counties enter the pipeline through `config/counties/<slug>.json`, `scrapers/<source>.py`, and the translator registry — never through hardcoded source dispatch or in-code municipality lists. This means the same `scaffold/pipeline/` runs for any county.
-
-Phase 0 ends at a Build Mode Approval Gate. Build Mode (scrapers, dashboards, deployment) only starts when the operator explicitly authorizes it.
+1. **The county config is written by the writer, never by hand.** If `write_county_config.py` returns `JSON_INVALID` or `SCHEMA_INVALID`, exactly one structured repair is attempted, then the build stops with `CONFIG_WRITE_FAILED`. It does not silently proceed.
+2. **The framework is universal; the county is configured.** MASTER_PROMPT §4.31 forbids county-specific data in universal pipeline code. The same `scaffold/pipeline/` runs for every county.
+3. **No P0 distress source, no build.** If no daily-refresh distress source is unblocked, Phase 0 halts with a verdict rather than filling a dashboard with parcel data.
+4. **Recon is metadata-only.** No record scraping, no account creation, no payment, no CAPTCHA solving, no robots.txt bypass during Phase 0.
 
 ---
 
@@ -137,16 +156,32 @@ xcerebro-county-intel/
 │   ├── _schema.json                          # JSON Schema (validates configs)
 │   └── _template.json                        # empty config to copy for new counties
 │
-└── scaffold/data/                # synthetic test harness
-    ├── README.md
-    ├── synthetic_parcels.jsonl               # 12 parcels covering all scenarios
-    ├── synthetic_signals.jsonl               # 24 signals across all 11 patterns
-    └── synthetic_expectations.json           # what the build should produce
+├── runs/<slug>/                  # per-county run folder (launch file, notes,
+│                                 # recon artifacts, phase gates)
+│
+└── scaffold/
+    ├── bootstrap_county.py       # creates runs/<slug>/ — the only bootstrap step
+    ├── pipeline/                 # THE EXECUTABLE PIPELINE
+    │   ├── normalize.py classify.py matcher.py aggregator.py
+    │   ├── score.py review.py dashboard.py run_pipeline_staged.py
+    │   ├── contracts/            # JSON Schema record shapes
+    │   └── translators/          # source -> canonical translators
+    ├── ops/                      # write_county_config.py, PII guard,
+    │                             # verify_live.py + watchdog.py (STUBS)
+    ├── data/                     # synthetic test harness
+    │   ├── synthetic_parcels.jsonl           # 12 parcels covering all scenarios
+    │   ├── synthetic_signals.jsonl           # 24 signals across all 11 patterns
+    │   └── synthetic_expectations.json       # what the build should produce
+    └── tests/                    # 37 gate tests — run_all.py
+        ├── v5_3_0/               # architecture-contract invariants
+        ├── v5_4_0/               # pipeline contract-shape tests
+        ├── v5_6_0/               # recon protocol Gap 4-7 invariants
+        └── v5_4_0_pending/       # red by design, NOT in the default gate
 ```
 
 ## How to use it (detailed)
 
-**For first-time use, see the Quick Start at the top of this README or read `START_HERE.md`.** The flow below is the manual / advanced operator path used when bootstrap autonomy is not desired (e.g. CI environments, custom slug conventions, or scripted builds).
+**For first-time use, see "How a build actually runs" at the top of this README, or read `START_HERE.md`.** The flow below expands the same path with the per-phase detail.
 
 1. Read `MIGRATION.md` end-to-end.
 2. Create a private GitHub repo for the county build (e.g. `<county-slug>-intel`).
@@ -158,7 +193,7 @@ xcerebro-county-intel/
    ```
 6. Claude Code runs Phase 0 → review change manifest → operator authorizes Phase 1 → Claude Code runs Phase 1 → review → and so on.
 7. Run the deployment checklist in `MIGRATION.md` after Phase 8 completes.
-8. The county is autonomous and refreshing daily.
+8. The county refreshes on a schedule. It is not unattended: source heartbeats, review-queue depth, and adapter failures need an operator watching them, and portals change without notice. Budget for ongoing maintenance rather than assuming a finished build stays finished.
 
 ## County build workflow
 
@@ -175,28 +210,39 @@ The framework's build sequence, phase by phase:
 
 ## How to run the gate tests
 
-The framework ships with two gate tests that must pass before any build is considered shippable. Run them both with one command:
+The framework ships **37 gate tests** that must all pass before a build is considered shippable. Run them with one command:
 
 ```
 python scaffold/tests/run_all.py
 ```
 
-Both tests can also be run individually if you want focused output:
+The runner exits 0 only when every test exits 0. It auto-discovers everything in `scaffold/tests/v5_3_0/`, `v5_4_0/`, and `v5_6_0/`, so new invariants are gated without editing the runner. `v5_4_0_pending/` is deliberately NOT discovered — those are red-by-design behavioral specs.
+
+Individual tests can be run directly for focused output:
 
 ```
 python scaffold/tests/test_golden_path.py
-python scaffold/tests/test_county_agnostic_regression.py
+python scaffold/tests/v5_6_0/test_recon_requires_freshness_check.py
 ```
-
-The runner exits 0 only when every test exits 0.
 
 ## Versioning
 
-This is **v5.5.0 (stable)**.
+This is **v5.6.0 (stable)**.
 
 - Patch (5.0.1) — clarifications, doc fixes
 - Minor (5.1.0) — new patterns, sources, deal paths, architecture additions
 - Major (6.0.0) — breaking changes requiring migration of existing county builds
+
+**v5.6.0 added** (released 2026-08-04):
+
+Four mandatory recon steps (Protocol 01 §01.28–§01.32), each closing a class of false recon outcome observed in a real build, plus four new gate tests:
+
+- **Gap 4 — access-control enforcement verification.** A control that *exists* is not a control that *blocks*. No source may be classified blocked until one low-volume good-faith request has been made and its actual response recorded. Adds `SINGLE_LAYER_HUMAN_VERIFIABLE` / `MULTI_LAYER` / `PER_REQUEST_CHALLENGE` tiering — a single-layer human-verifiable challenge is explicitly **not** a build blocker, it is an operator-assisted source cleared once by hand, after which the adapter resumes against the established session.
+- **Gap 5 — canonical lead-type terminology verification.** Lead type names in §16.B are *framework* vocabulary, not local vocabulary. Terminology must be established empirically from the jurisdiction's own controlled vocabulary, and the **originating event** must be separated from downstream stages of the same distress process — the earliest reliably public artifact is where the lead-time advantage lives. Adds `NOT_APPLICABLE_IN_JURISDICTION` for types structurally absent under the local legal regime.
+- **Gap 6 — tax roll and delinquency enrichment discovery.** `TAX_ROLL`, `DELINQUENCY_LIST`, and `BALANCE_LOOKUP` are searched and classified separately, with a delivery-mechanism preference order and a mandatory state-level fallback. A tax sale list covers only parcels already at sale eligibility and does not substitute for a delinquency feed.
+- **Gap 7 — source freshness verification.** Advertised cadence is a *claim*; maximum actual record date is the *evidence*. Adds `LIVE` / `LAGGING` / `FROZEN` / `UNKNOWN`. A `FROZEN` source cannot satisfy the P0 gate regardless of record volume, and a stale bulk extract must never displace the live authoritative portal exposing the same records.
+- 8 new locked rules in `FRAMEWORK_VERSION.json`.
+- **README and `START_HERE.md` rewritten** to remove the "one sentence autonomous install" framing, which misrepresented how a county build actually runs.
 
 **v5.5.0 added** (released 2026-06-26):
 
@@ -246,7 +292,7 @@ This is **v5.5.0 (stable)**.
 - **Operator-readable lead names rule** (Section 4.13) — no raw clerk codes in operator-facing surfaces.
 - **Schema breaking changes** — 26 new source-level fields, 3 new top-level fields, 7 new enum types. v4.x configs require Phase 0 re-recon to populate new proof packet fields.
 
-**v4.1.0 added** (preserved in v5.0.0): the one-sentence install flow, `scaffold/bootstrap_county.py`, `START_HERE.md`, `MASTER_PROMPT.md` Section 4.5 (autonomous first-run rule), and the `runs/<slug>/` directory convention.
+**v4.1.0 added** (preserved in v5.0.0): `scaffold/bootstrap_county.py`, `START_HERE.md`, `MASTER_PROMPT.md` Section 4.5, and the `runs/<slug>/` directory convention. The "one-sentence install" flow introduced here was retired in v5.6.0 — the tooling remains, the misleading framing does not.
 
 Each county's `BUILD_SUMMARY.md` records the framework version it was built against.
 
