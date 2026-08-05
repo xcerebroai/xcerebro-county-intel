@@ -19,7 +19,7 @@ Here is the honest version:
 - The judgment calls that matter most cannot be delegated blind: whether a source is *actually* blocked or just looks blocked, whether a lead type exists in that jurisdiction under a different name, whether a feed advertised as daily is actually current. The protocol forces these checks; a human still reviews the answers.
 - Portals change without notice. A finished county build is a maintained system, not a finished artifact.
 
-What you genuinely get: a rigorous, repeatable protocol; 37 automated gate tests; contract schemas that keep the pipeline honest; and a build that refuses to fake productivity when a county's sources don't support it.
+What you genuinely get: a rigorous, repeatable protocol; 35 automated gate test suites (539 assertions); contract schemas that keep the pipeline honest; and a build that refuses to fake productivity when a county's sources don't support it.
 
 ---
 
@@ -44,7 +44,9 @@ The framework lives *inside* the county build repo. The county repo is what you 
 python scaffold/tests/run_all.py
 ```
 
-Expect `RESULT: PASS` across 37 tests. If this fails before you've changed anything, stop and fix the environment — don't build on a broken harness.
+Expect `RESULT: PASS` across 35 suites. If this fails before you've changed anything, stop and fix the environment — don't build on a broken harness.
+
+Note: `scaffold/tests/verify_synthetic_harness.py` is an intentional stub that prints a redirect and asserts nothing. Its acceptance coverage moved into `test_golden_path.py` and the two staged-pipeline end-to-end tests, which the gate does run. Do not treat that file as the synthetic harness.
 
 ### 3. Bootstrap the run folder
 

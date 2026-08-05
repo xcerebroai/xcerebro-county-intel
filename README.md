@@ -14,7 +14,7 @@ This is not a county-specific build. It is a portable shell. County-specific dat
 **What works today:**
 
 - The **staged pipeline** is executable end to end: normalize → classify → match → aggregate → score → review → dashboard (`scaffold/pipeline/`).
-- **Phase 0 county recon** is a formalized protocol with 7 mandatory gap-closing steps and 37 automated gate tests.
+- **Phase 0 county recon** is a formalized protocol with 7 mandatory gap-closing steps, gated by 35 automated test suites (539 assertions).
 - **Contract schemas** for every record shape in the pipeline, schema-validated.
 - **Synthetic test harness** so a build can be exercised before real county data enters it.
 
@@ -172,7 +172,7 @@ xcerebro-county-intel/
     │   ├── synthetic_parcels.jsonl           # 12 parcels covering all scenarios
     │   ├── synthetic_signals.jsonl           # 24 signals across all 11 patterns
     │   └── synthetic_expectations.json       # what the build should produce
-    └── tests/                    # 37 gate tests — run_all.py
+    └── tests/                    # 35 gate suites / 539 assertions — run_all.py
         ├── v5_3_0/               # architecture-contract invariants
         ├── v5_4_0/               # pipeline contract-shape tests
         ├── v5_6_0/               # recon protocol Gap 4-7 invariants
@@ -210,7 +210,7 @@ The framework's build sequence, phase by phase:
 
 ## How to run the gate tests
 
-The framework ships **37 gate tests** that must all pass before a build is considered shippable. Run them with one command:
+The framework ships **35 gate test suites (539 assertions)** that must all pass before a build is considered shippable. Run them with one command:
 
 ```
 python scaffold/tests/run_all.py
