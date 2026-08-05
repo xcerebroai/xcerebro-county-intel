@@ -14,7 +14,7 @@ This is not a county-specific build. It is a portable shell. County-specific dat
 **What works today:**
 
 - The **staged pipeline** is executable end to end: normalize → classify → match → aggregate → score → review → dashboard (`scaffold/pipeline/`).
-- **Phase 0 county recon** is a formalized protocol with 7 mandatory gap-closing steps, gated by 35 automated test suites (539 assertions).
+- **Phase 0 county recon** is a formalized protocol with 7 mandatory gap-closing steps, gated by 36 automated test suites (540 assertions).
 - **Contract schemas** for every record shape in the pipeline, schema-validated.
 - **Synthetic test harness** so a build can be exercised before real county data enters it.
 
@@ -172,7 +172,7 @@ xcerebro-county-intel/
     │   ├── synthetic_parcels.jsonl           # 12 parcels covering all scenarios
     │   ├── synthetic_signals.jsonl           # 24 signals across all 11 patterns
     │   └── synthetic_expectations.json       # what the build should produce
-    └── tests/                    # 35 gate suites / 539 assertions — run_all.py
+    └── tests/                    # 36 gate suites / 540 assertions — run_all.py
         ├── v5_3_0/               # architecture-contract invariants
         ├── v5_4_0/               # pipeline contract-shape tests
         ├── v5_6_0/               # recon protocol Gap 4-7 invariants
@@ -210,7 +210,7 @@ The framework's build sequence, phase by phase:
 
 ## How to run the gate tests
 
-The framework ships **35 gate test suites (539 assertions)** that must all pass before a build is considered shippable. Run them with one command:
+The framework ships **36 gate test suites (540 assertions)** that must all pass before a build is considered shippable. Run them with one command:
 
 ```
 python scaffold/tests/run_all.py
@@ -241,6 +241,7 @@ Four mandatory recon steps (Protocol 01 §01.28–§01.32), each closing a class
 - **Gap 5 — canonical lead-type terminology verification.** Lead type names in §16.B are *framework* vocabulary, not local vocabulary. Terminology must be established empirically from the jurisdiction's own controlled vocabulary, and the **originating event** must be separated from downstream stages of the same distress process — the earliest reliably public artifact is where the lead-time advantage lives. Adds `NOT_APPLICABLE_IN_JURISDICTION` for types structurally absent under the local legal regime.
 - **Gap 6 — tax roll and delinquency enrichment discovery.** `TAX_ROLL`, `DELINQUENCY_LIST`, and `BALANCE_LOOKUP` are searched and classified separately, with a delivery-mechanism preference order and a mandatory state-level fallback. A tax sale list covers only parcels already at sale eligibility and does not substitute for a delinquency feed.
 - **Gap 7 — source freshness verification.** Advertised cadence is a *claim*; maximum actual record date is the *evidence*. Adds `LIVE` / `LAGGING` / `FROZEN` / `UNKNOWN`. A `FROZEN` source cannot satisfy the P0 gate regardless of record volume, and a stale bulk extract must never displace the live authoritative portal exposing the same records.
+- **§01.14 / §01.33 — consolidated recon format.** The eight §01.14 recon artifacts are a *content* contract, not a filesystem contract. A single consolidated recon document is now explicitly compliant **provided** it carries a mandatory section-to-artifact index mapping all eight artifacts (and the §01.20 matrix companions) to the sections holding their content. An artifact whose content is genuinely absent must be listed as an explicit gap, never silently omitted. A consolidated recon without the index is non-compliant — this closes the loophole rather than opening one.
 - 8 new locked rules in `FRAMEWORK_VERSION.json`.
 - **README and `START_HERE.md` rewritten** to remove the "one sentence autonomous install" framing, which misrepresented how a county build actually runs.
 
