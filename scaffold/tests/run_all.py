@@ -60,6 +60,14 @@ if _v5_4_0_dir.is_dir():
     for _script in sorted(_v5_4_0_dir.glob("test_*.py")):
         TESTS.append((f"v5.4.0 contract-shape — {_script.stem}", _script))
 
+# v5.6.0+ — recon-protocol invariants for the Gap 4-7 required steps
+# (access-control enforcement, lead-type terminology, tax roll / delinquency
+# discovery, source freshness). Auto-discovered, same as v5_3_0.
+_v5_6_0_dir = TESTS_DIR / "v5_6_0"
+if _v5_6_0_dir.is_dir():
+    for _script in sorted(_v5_6_0_dir.glob("test_*.py")):
+        TESTS.append((f"v5.6.0 invariant — {_script.stem}", _script))
+
 
 def main():
     results = []

@@ -1,4 +1,4 @@
-# 01. County Recon Protocol (v5.5.0)
+# 01. County Recon Protocol (v5.6.0)
 
 The county recon protocol is the deterministic procedure Claude Code follows during
 Phase 0 of a county build. It turns a freshly bootstrapped county run folder into a
@@ -23,11 +23,21 @@ expands from 27 to 29 types (adding Bankruptcy Notice and Public Notice — see 
 UCC/entity portals are classified as `ENRICHMENT_SOURCE` + `build_priority: future` —
 recon locates and records the portal URL but does not build an adapter.
 
+**v5.6.0 amendment.** Four additional mandatory recon steps (§01.28–§01.32) apply
+within Phases 0.A–0.H, before any source is classified blocked, deferred, or
+limited-coverage: access-control ENFORCEMENT verification (Gap 4 — a control that
+exists is not a control that blocks), canonical lead-type TERMINOLOGY verification
+(Gap 5 — framework lead-type names are not local names, and the originating event
+is not the downstream stage), tax roll and delinquency ENRICHMENT discovery
+(Gap 6), and source FRESHNESS verification (Gap 7 — catalog cadence is a claim,
+max record date is the evidence).
+
 ---
 
 ## 01.0 Status and scope
 
-- **Version:** v5.5.0 (extends v5.3.0; does not require any later patch to function).\n- **Date:** 2026-06-26.
+- **Version:** v5.6.0 (extends v5.5.0 and v5.3.0; does not require any later patch to function).
+- **Date:** 2026-08-04.
 - **Purpose:** a county-agnostic Phase 0 recon procedure.
 - **Authoritative for:** Phase 0 work for any new county, after
   `scaffold/bootstrap_county.py` has created the flat run folder and the user has
@@ -763,3 +773,241 @@ Classification rules for the new queries:
   `source_role_classification.md` and fingerprinted.
 - All fifteen queries must be documented in `api_discovery_report.md` with the
   outcome of each (source found / not found / blocked / enrichment-only).
+
+---
+
+## 01.28 v5.6.0 amendment — four additional mandatory recon steps
+
+v5.6.0 extends this protocol with four required steps (§01.29–§01.32). Like the
+v5.3.0 gaps, they apply WITHIN Phases 0.A–0.H and must be satisfied BEFORE any
+source is classified blocked, deferred, limited-coverage, or not-buildable.
+
+Each of the four exists because the absence of the step produced a specific
+class of false recon outcome: a buildable source recorded as blocked, a lead
+type recorded as absent because it is named differently locally, an enrichment
+layer never discovered, or a frozen archive trusted as a live feed. All four
+are false negatives or false positives that recon is supposed to catch.
+
+## 01.29 Required Step — Access-control enforcement verification (Gap 4)
+
+The presence of an access-control mechanism is NOT evidence that the mechanism
+is enforced. Recon MUST distinguish a control that EXISTS from a control that
+BLOCKS.
+
+Before classifying any source as `CAPTCHA_PROTECTED`, `LOGIN_REQUIRED`,
+`BLOCKED`, or any other blocked access class, recon MUST attempt one
+low-volume, good-faith request along the portal's ordinary public path and
+record what the portal actually returned.
+
+The distinction that must be drawn:
+
+    CONTROL PRESENT      a CAPTCHA widget, login form, challenge script, or
+                         anti-bot library is present in the markup, the client
+                         bundle, or the request flow
+    CONTROL ENFORCED     the control actually gates the records — the request
+                         fails, returns a challenge, or returns no data until
+                         the control is satisfied
+
+A control that is present but not enforced is NOT a blocker. Common patterns
+that produce false blocked classifications:
+
+- a CAPTCHA library bundled into a client application but only invoked
+  conditionally (after a request threshold, for a specific search mode, or for
+  a specific record class);
+- a login affordance that gates saved searches, alerts, or document images
+  while leaving the search index itself public;
+- an anti-bot script that fingerprints without challenging;
+- a challenge that applies to one search mode while another mode of the same
+  portal returns the same records unchallenged.
+
+The recon report MUST explicitly answer, per source: "Access control present:
+Y/N (which). Enforcement tested: Y/N. Observed result of the good-faith
+request: <status, response shape, and whether records were returned>."
+
+Recording a blocked classification without an enforcement test is a recon
+defect.
+
+**Enforcement tiering.** When a control IS enforced, recon MUST additionally
+classify how many independent layers must be cleared, because this determines
+whether the source is recoverable by an operator-assisted path:
+
+    SINGLE_LAYER_HUMAN_VERIFIABLE   one human-solvable challenge (image
+                                    challenge, checkbox attestation, emailed or
+                                    SMS one-time code) gates a session that then
+                                    persists for subsequent requests
+    MULTI_LAYER                     two or more independent controls compound
+                                    (for example a challenge plus credentialed
+                                    login, or a per-request token that cannot
+                                    outlive a single call)
+    PER_REQUEST_CHALLENGE           the control re-fires on every request, so no
+                                    durable session exists
+
+`SINGLE_LAYER_HUMAN_VERIFIABLE` is NOT a build blocker. It is an
+operator-assisted source. The framework's locked rules permit
+`operator_seeded_session_allowed`, `captcha_solver_allowed`, and
+`stealth_browser_allowed` in Build Mode; a single-layer human-verifiable
+control is cleared once by the operator, and the adapter resumes against the
+established session. Recon records the handoff requirement and the expected
+session lifetime; it does not solve the challenge itself (§01.17 still binds
+during recon) and it does not mark the source unbuildable.
+
+Escalation order for an enforced control, recorded as the source's
+`next_access_strategy`:
+
+    1.  find an unchallenged equivalent path on the same portal (alternate
+        search mode, documented API, bulk export, mirror layer)
+    2.  operator-assisted manual verification with session handoff
+        (SINGLE_LAYER_HUMAN_VERIFIABLE)
+    3.  cost-gated or credential-gated strategies per `MASTER_PROMPT.md §4.14`
+    4.  mark blocked and escalate to the operator
+
+Only after steps 1–3 have been evaluated and recorded may a source carry a
+blocked classification. Manual operator verification is an accepted resolution
+path, not a failure state.
+
+## 01.30 Required Step — Canonical lead-type terminology verification (Gap 5)
+
+Lead type names in `§16.B` are FRAMEWORK vocabulary. They are not guaranteed to
+be the vocabulary the jurisdiction uses, and the framework's name for a lead
+type MUST NOT be assumed to be the local name for the underlying event.
+
+For every lead type in the §01.21 sweep, recon MUST establish what the
+jurisdiction actually calls the corresponding event, and MUST identify the
+event that ORIGINATES the lead rather than a downstream stage of the same
+process.
+
+Required distinctions:
+
+- **Originating event vs downstream stage.** A single distress process
+  typically emits several public artifacts in sequence — an initiating filing,
+  one or more interim notices, a judgment or order, a disposition or sale, and
+  a post-disposition transfer. These are stages of ONE process, not independent
+  lead types. Recon MUST identify which stage is the earliest reliably public
+  artifact, because that stage carries the lead-time advantage. A later stage
+  is a SUPPORTING signal for the same target, not the primary.
+- **Local naming.** The same event carries different names across
+  jurisdictions, and a name used in one jurisdiction may denote a different
+  event in another. Terminology recon MUST be driven by the jurisdiction's own
+  taxonomy — the court's case-type table, the recorder's document-type list,
+  the tax authority's sale nomenclature, or the equivalent controlled
+  vocabulary — not by the framework's label and not by general knowledge.
+- **Procedural regime.** Whether a given lead type exists at all is a function
+  of the jurisdiction's legal regime. A lead type may be structurally absent,
+  and its framework name may still appear in unrelated local usage. Recon
+  records `NOT_APPLICABLE_IN_JURISDICTION` with the regime evidence rather than
+  `NOT_FOUND`.
+
+Method — terminology must be established EMPIRICALLY, from the source's own
+controlled vocabulary, not inferred:
+
+    1.  retrieve the jurisdiction's authoritative type list (case-type table,
+        document-type dropdown, sale-category list, violation-type list)
+    2.  where the portal permits it, measure observed frequency per type over a
+        bounded recent window, to separate live types from vestigial ones
+    3.  map each observed local type to a canonical §16.B lead type, or to
+        NOISE, recording the mapping and the evidence
+    4.  for each mapped lead type, record which local type is the ORIGINATING
+        event and which are downstream stages of the same process
+
+The recon report MUST explicitly answer, per lead type: "Local name(s):
+<names>. Originating event: <local type>. Downstream stages: <local types>.
+Evidence: <how the vocabulary was obtained>."
+
+A lead type recorded as `NOT_FOUND` without a terminology check against the
+jurisdiction's own vocabulary is a recon defect. So is a lead type whose
+recorded source of record is a downstream stage when an earlier public
+originating artifact exists.
+
+## 01.31 Required Step — Tax roll and delinquency enrichment discovery (Gap 6)
+
+Recon MUST explicitly search for a property tax roll and a tax delinquency
+feed, and MUST record the outcome even when the result is that none exists.
+These are distinct from the tax sale source found by the §01.6 query 6 and from
+the treasurer portal found by the §01.27 query 14: a tax sale list enumerates
+only parcels that have already reached sale eligibility, which is a small and
+late-stage subset of the distressed universe.
+
+Three distinct artifacts must each be searched for and classified separately:
+
+    TAX_ROLL             the full assessment/valuation/ownership roll for all
+                         parcels — an ENRICHMENT_SOURCE providing owner of
+                         record, mailing address, assessed and market values,
+                         exemption flags, property class, and tax district
+    DELINQUENCY_LIST     parcels carrying an unpaid balance but not yet in a
+                         sale — a PRIMARY_LEAD_SOURCE for the Tax Delinquency
+                         lead type
+    BALANCE_LOOKUP       current amount owed for a given parcel — enrichment
+                         that qualifies severity on an existing lead
+
+For each, recon MUST record the delivery mechanism, preferring the most stable
+available and searching in this order:
+
+    1.  authenticated or open API with a documented contract (record whether a
+        key is required, how it is obtained, cost, and rate limits)
+    2.  bulk download — full-roll export in a structured format, with its
+        refresh cadence
+    3.  open-data portal dataset backed by a queryable service endpoint
+    4.  per-parcel query interface (PER_RECORD_ONLY per §01.24)
+    5.  scheduled or standing bulk delivery arranged with the authority
+    6.  no programmatic access
+
+Search targets must include, at minimum, the jurisdiction's assessment
+authority, its tax billing and collection authority, its open-data portal, and
+the corresponding STATE-level authority — many jurisdictions publish a
+standardized statewide tax billing or assessment lookup that is more uniform,
+better documented, and more scriptable than the local equivalent. A state-level
+source covering the target jurisdiction is a valid and often preferable answer.
+
+The recon report MUST explicitly answer: "Tax roll: <mechanism + cadence + key
+requirement>. Delinquency list: <mechanism + cadence>. Balance lookup:
+<mechanism>. Search paths checked: <list>."
+
+Per §13, a tax roll is ENRICHMENT and cannot originate a lead. A delinquency
+list IS a primary distress signal and counts toward the P0 gate.
+
+## 01.32 Required Step — Source freshness verification (Gap 7)
+
+Recon MUST verify the freshness of every source's ACTUAL RECORDS, not its
+advertised or catalog-reported update cadence. A dataset's stated refresh
+schedule, portal "last updated" stamp, or catalog metadata is a CLAIM. The
+maximum event date present in the records is the EVIDENCE.
+
+Publication metadata and record recency diverge routinely: an extract can be
+republished on a schedule long after its upstream feed stopped delivering, so
+the catalog timestamp advances while the newest record does not. A source in
+this state is a historical archive presented as a live feed.
+
+For every source, recon MUST determine and record:
+
+    max_event_date        the newest event/filing/record date actually present
+    min_event_date        the oldest, establishing backfill depth
+    observed_lag          max_event_date measured against the recon date
+    claimed_cadence       the refresh cadence the source advertises
+    freshness_verdict     one of the values below
+
+Freshness verdicts:
+
+    LIVE                  observed lag is consistent with the claimed cadence
+    LAGGING               records arrive but materially later than claimed
+    FROZEN                no records after a fixed cutoff — a historical
+                          archive regardless of what the catalog reports
+    UNKNOWN               recency could not be determined without a forbidden
+                          action (§01.17)
+
+Consequences, which are binding on the §01.15 handoff:
+
+- a `FROZEN` source MUST NOT be counted as a P0 daily-refresh distress source
+  and MUST NOT satisfy the P0 gate, whatever its record volume;
+- a `FROZEN` or `LAGGING` source may still be valuable for historical backfill,
+  and recon should say so explicitly rather than discarding it;
+- when a bulk extract is `FROZEN` but a live interactive portal exposes the
+  same records, recon MUST record both — the extract for backfill and the
+  portal as the current-data path — and MUST NOT let the convenient stale
+  source displace the authoritative live one.
+
+The recon report MUST explicitly answer, per source: "Max record date:
+<date>. Observed lag: <duration>. Claimed cadence: <cadence>. Freshness
+verdict: <verdict>."
+
+Classifying a source as a live P0 feed without a freshness check is a recon
+defect.

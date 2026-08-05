@@ -4,10 +4,10 @@
   "license": "Proprietary VIP-only license",
   "license_file": "LICENSE.md",
   "is_open_source": false,
-  "framework_version": "v5.5.0",
-  "previous_version": "v5.4.0",
+  "framework_version": "v5.6.0",
+  "previous_version": "v5.5.0",
   "framework_codename": "Xcerebro County Intelligence Harness",
-  "locked_at": "2026-06-26",
+  "locked_at": "2026-08-04",
   "locked_rules": {
     "county_specific_examples_allowed": false,
     "github_pages_allowed": true,
@@ -29,7 +29,15 @@
     "only_canonical_types_score": true,
     "negative_signals_suppress_only_linked_targets": true,
     "unknown_doc_types_route_to_review": true,
-    "p0_distress_source_required_for_shippable_build": true
+    "p0_distress_source_required_for_shippable_build": true,
+    "access_control_enforcement_must_be_tested_before_blocked": true,
+    "single_layer_human_verifiable_control_is_not_a_build_blocker": true,
+    "operator_assisted_session_handoff_is_a_valid_resolution": true,
+    "lead_type_terminology_must_be_verified_against_local_vocabulary": true,
+    "originating_event_preferred_over_downstream_stage": true,
+    "tax_roll_delinquency_and_balance_discovery_required": true,
+    "source_freshness_must_be_evidence_based": true,
+    "frozen_sources_cannot_satisfy_p0_gate": true
   },
   "source_priority_definitions": {
     "P0": "daily-refresh distress sources (clerk, court, sheriff, code, tax delinquency) \u2014 at least one P0 must be unblocked for a shippable build",
@@ -94,6 +102,11 @@
   ],
   "release_channel": "stable",
   "changelog": [
+    {
+      "version": "v5.6.0",
+      "date": "2026-08-04",
+      "summary": "Recon protocol Gaps 4-7 (Protocol 01 §01.28-§01.32), each closing a class of false recon outcome. Gap 4: access-control ENFORCEMENT must be tested before any blocked classification — a control that exists is not a control that blocks; adds SINGLE_LAYER_HUMAN_VERIFIABLE / MULTI_LAYER / PER_REQUEST_CHALLENGE tiering, and a single-layer human-verifiable control is explicitly NOT a build blocker but an operator-assisted session handoff. Gap 5: lead type names are framework vocabulary, not local vocabulary — terminology must be established empirically from the jurisdiction's own controlled vocabulary, and the ORIGINATING event must be separated from downstream stages of the same distress process; adds NOT_APPLICABLE_IN_JURISDICTION. Gap 6: tax roll, delinquency list, and balance lookup must be searched and classified separately, with a delivery-mechanism preference order and a state-level fallback; a tax sale list does not substitute for a delinquency feed. Gap 7: freshness must be verified from max actual record date, not advertised cadence; adds LIVE/LAGGING/FROZEN/UNKNOWN, and a FROZEN source cannot satisfy the P0 gate. Four new gate tests auto-discovered from scaffold/tests/v5_6_0/."
+    },
     {
       "version": "v5.5.0",
       "date": "2026-06-26",
