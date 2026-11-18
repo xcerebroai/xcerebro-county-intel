@@ -14,9 +14,8 @@
         <span class="brand-subtitle" id="brand-subtitle">Daily-refreshed real estate distress signals</span>
       </div>
       <div class="topbar-meta">
-        <span class="meta-pill" id="build-label">FULL_BUILD</span>
         <span class="meta-pill" id="generated-at">—</span>
-        <span class="meta-pill" id="view-mode-pill">CLIENT_VIEW</span>
+        <span class="meta-pill" id="view-mode-pill">Research view</span>
       </div>
     </div>
   </header>
@@ -49,9 +48,9 @@
       <div class="rail-group rail-actions">
         <button id="reset-filters" class="action-btn">Reset filters</button>
         <button id="toggle-view-mode" class="action-btn secondary">
-          Switch to Operator View
+          Show review queue
         </button>
-        <button id="csv-export" class="action-btn primary" data-testid="csv-export">
+        <button id="csv-export" disabled class="action-btn primary" data-testid="csv-export">
           Export CSV
         </button>
       </div>
@@ -93,7 +92,6 @@
   <footer class="footer">
     <span id="footer-counts">—</span>
     <span class="footer-spacer"></span>
-    <a class="footer-link" id="repo-link" href="#" target="_blank" rel="noopener" hidden>repo</a>
   </footer>
 
   <script src="dashboard.js" defer></script>
